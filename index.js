@@ -13,13 +13,19 @@ const run = async (credentials, wantedBus) => {
   const cookie = await requestCookie(username, password);
 
   setCookie(cookie);
+  let busId;
+  let attempts = 0;
 
-  const busId = await getBuses(
-    busTime.split(":")[0],
-    busTime.split(":")[1],
-    depart,
-    destination
-  );
+  while (busId === undefined) {
+    console.log("attempt number:", attempts++);
+
+    busId = await getBuses(
+      busTime.split(":")[0],
+      busTime.split(":")[1],
+      depart,
+      destination
+    );
+  }
 
   const message = await book(busId);
   console.log(message);
