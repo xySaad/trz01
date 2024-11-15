@@ -1,0 +1,17 @@
+{
+  "username": "srm",
+  "schedule": [
+    {
+      "runOn": "12:00",
+      "busTime": "18:00",
+      "depart": "Campus",
+      "destination": "Bab El Gharbi"
+    },
+    {
+      "runOn": "16:00",
+      "busTime": "10:00",
+      "depart": "Bab El Gharbi",
+      "destination": "Campus"
+    }
+  ]
+}

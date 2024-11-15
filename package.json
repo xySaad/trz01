@@ -1,0 +1,27 @@
+{
+  "name": "trz01",
+  "version": "1.0.0",
+  "description": "automate zone01 transport booking",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node  index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xySaad/trz01.git"
+  },
+  "keywords": [
+    "zone01"
+  ],
+  "author": "xySaad (srm)",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/xySaad/trz01/issues"
+  },
+  "homepage": "https://github.com/xySaad/trz01#readme",
+  "dependencies": {
+    "node-schedule": "^2.1.1"
+  }
+}
