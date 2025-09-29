@@ -1,45 +1,12 @@
 import puppeteer from "puppeteer";
 import { config } from "dotenv";
-import fs from "fs/promises";
-import wavefile from "wavefile";
 import { pipeline } from "@xenova/transformers";
-import ffmpeg from "fluent-ffmpeg";
-import ffmpegStatic from "ffmpeg-static";
-import { Readable } from "stream";
-import { Buffer } from "buffer";
+import { convertMp3BufferToWav, waveBufferToF64 } from "./utils/audio.js";
+import { Signal } from "./utils/signal.js";
 
-// Set FFmpeg path
-ffmpeg.setFfmpegPath(ffmpegStatic);
-
-async function convertMp3BufferToWav(mp3Buffer) {
-  return new Promise((resolve, reject) => {
-    // Create a readable stream from the MP3 buffer
-    const mp3Stream = new Readable();
-    mp3Stream.push(mp3Buffer);
-    mp3Stream.push(null); // Signal end of stream
-
-    // Buffer to store WAV data
-    const chunks = [];
-
-    // Convert MP3 stream to WAV
-    ffmpeg(mp3Stream)
-      .inputFormat("mp3")
-      .audioChannels(1) // Mono
-      .audioFrequency(16000) // 16kHz for Whisper compatibility
-      .audioCodec("pcm_s16le") // PCM signed 16-bit little-endian
-      .toFormat("wav")
-      .on("error", (err) => {
-        console.error("FFmpeg error:", err);
-        reject(err);
-      })
-      .on("end", () => {
-        console.log("Conversion complete");
-        resolve(Buffer.concat(chunks));
-      })
-      .pipe() // Stream output
-      .on("data", (chunk) => chunks.push(chunk))
-      .on("error", (err) => reject(err));
-  });
+config();
+if (!process.env.TOKEN) {
+  throw new Error("Missing TOKEN in .env");
 }
 
 const transcriber = await pipeline(
@@ -47,10 +14,13 @@ const transcriber = await pipeline(
   "Xenova/whisper-tiny"
 );
 
-config();
+const sleep = async (delay) => await new Promise((r) => setTimeout(r, delay));
 
 async function main() {
-  const browser = await puppeteer.launch({ headless: false });
+  const browser = await puppeteer.launch({
+    headless: false,
+    executablePath: "/usr/bin/chromium-browser",
+  });
   const page = await browser.newPage();
 
   browser.setCookie({
@@ -63,7 +33,9 @@ async function main() {
   });
 
   await page.goto("https://transport.zone01oujda.ma/");
+  // await page.goto("https://2captcha.com/demo/recaptcha-v2");
 
+  const answer = new Signal();
   page.on("response", async (response) => {
     try {
       if (
@@ -72,27 +44,10 @@ async function main() {
       ) {
         const buffer = await response.buffer();
         console.log("Got media response bytes:", buffer.length);
-
-        await fs.writeFile("payload.mp3", buffer);
-        console.log("Saved payload.mp3");
-        let wav = new wavefile.WaveFile(await convertMp3BufferToWav(buffer));
-        wav.toBitDepth("32f");
-        wav.toSampleRate(16000);
-        let audioData = wav.getSamples();
-        if (Array.isArray(audioData)) {
-          if (audioData.length > 1) {
-            const SCALING_FACTOR = Math.sqrt(2);
-            for (let i = 0; i < audioData[0].length; ++i) {
-              audioData[0][i] =
-                (SCALING_FACTOR * (audioData[0][i] + audioData[1][i])) / 2;
-            }
-          }
-
-          audioData = audioData[0];
-        }
-
+        let audioData = waveBufferToF64(await convertMp3BufferToWav(buffer));
         const result = await transcriber(audioData);
         console.log("result:", result.text);
+        answer.resolve(result.text);
       }
     } catch (err) {
       console.error("Error handling response:", err);
@@ -105,14 +60,35 @@ async function main() {
 
   const iframe = await page.waitForSelector('iframe[title="reCAPTCHA"]');
   const frame = await iframe.contentFrame();
+  await frame.waitForSelector("#rc-anchor-container");
+  await sleep(Math.random() * 100 + 100);
   await frame.locator("#rc-anchor-container").click();
 
   const challenge_iframe = await page.waitForSelector(
     'iframe[title="recaptcha challenge expires in two minutes"]'
   );
+
   const challenge_frame = await challenge_iframe.contentFrame();
+  await challenge_frame.waitForSelector(".audio-button-holder");
+  await sleep(Math.random() * 100 + 100);
   await challenge_frame.locator(".audio-button-holder").click();
 
+  frame
+    .waitForSelector(".recaptcha-checkbox-checked")
+    .then(() => answer.reject());
+
+  while (true) {
+    try {
+      const text = await answer.promise;
+      answer.reset();
+      await challenge_frame.type("#audio-response", text, { delay: 60 });
+      await challenge_frame.click("#recaptcha-verify-button", { delay: 10 });
+    } catch {
+      break;
+    }
+  }
+
+  await page.locator("::-p-xpath(//button[text() = 'Confirm'])").click();
   await new Promise(() => {});
   await browser.close();
 }
