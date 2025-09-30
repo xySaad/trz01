@@ -59,18 +59,24 @@ export class CaptchaSolver {
     await challenge_frame.locator(".audio-button-holder").click();
 
     frame
-      .waitForSelector(".recaptcha-checkbox-checked")
+      .waitForSelector(".recaptcha-checkbox-checked", { timeout: 60000 })
       .then(() => this.#answer.reject());
 
     while (true) {
       try {
         const text = await this.#answer.promise;
         this.#answer.reset();
+        if (text.trim().length === 0) {
+          await challenge_frame.click("#recaptcha-reload-button", {
+            delay: 4.2,
+          });
+          continue;
+        }
         await challenge_frame.type("#audio-response", text, { delay: 20 });
         await challenge_frame.click("#recaptcha-verify-button", { delay: 10 });
       } catch {
         break;
       }
     }
-  }
+  } 
 }

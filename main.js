@@ -3,6 +3,8 @@ import { config as loadenv } from "dotenv";
 import puppeteer from "puppeteer";
 import { CaptchaSolver } from "./reCaptchaSovler/solver.js";
 import { intoUTC } from "./utils/time.js";
+import { testChromiumBinary } from "./utils/test.js";
+import { Signal } from "./utils/signal.js";
 
 loadenv();
 if (!process.env.TOKEN) throw new Error("Missing TOKEN in .env");
@@ -55,34 +57,39 @@ async function pollBuses({ hour, minute }) {
   });
 }
 
+async function runTask(traject) {
+  const browser = await puppeteer.launch({
+    headless: false,
+    executablePath: config.chormiumBinary,
+  });
+
+  browser.setCookie({
+    domain: "transport.zone01oujda.ma",
+    name: "__Secure-elgencia.session_token",
+    value: process.env.TOKEN,
+    path: "/",
+    secure: true,
+    httpOnly: true,
+  });
+
+  const page = await browser.newPage();
+
+  console.log(`Starting polling for ${traject} bus...`);
+  const [hour, minute] = traject.split(":");
+  await pollBuses(intoUTC(hour, minute));
+  await bookSeat(page, [hour, minute].join(":"));
+  const end = new Signal();
+  page.on("response", (e) => e.url().includes("booking") && end.resolve());
+  await end.promise;
+  await browser.close();
+}
+
 async function main() {
+  await testChromiumBinary(config.chormiumBinary);
+  if (config.test_slot) await runTask(config.test_slot);
   config.slots.forEach(({ run_at, traject }) => {
     const [hour, minute, seconds] = run_at.split(":");
-
-    cron.schedule(`${seconds} ${minute} ${hour} * * *`, async () => {
-      const browser = await puppeteer.launch({
-        headless: false,
-        executablePath: config.chormiumBinary,
-      });
-
-      browser.setCookie({
-        domain: "transport.zone01oujda.ma",
-        name: "__Secure-elgencia.session_token",
-        value: process.env.TOKEN,
-        path: "/",
-        secure: true,
-        httpOnly: true,
-      });
-
-      const page = await browser.newPage();
-
-      console.log(`Starting polling for ${traject} bus...`);
-      const [hour, minute] = traject.split(":");
-      await pollBuses(intoUTC(hour, minute));
-
-      await bookSeat(page, [hour, minute].join(":"));
-      await browser.close();
-    });
+    cron.schedule(`${seconds} ${minute} ${hour} * * *`, () => runTask(traject));
   });
 }
 

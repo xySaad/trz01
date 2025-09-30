@@ -1,9 +1,9 @@
 {
-  "chormiumBinary": "/usr/bin/chromium-browser",
-  "#chormiumBinary": "/usr/bin/google-chrome",
+  "chormiumBinary": "/usr/bin/google-chrome",
+  "#chormiumBinary": "/usr/bin/chromium-browser",
   "slots": [
     {
-      "run_at": "11:59:50",
+      "run_at": "12:23:00",
       "traject": "17:30",
       "destination": "Bab El Gharbi"
     },
@@ -12,5 +12,6 @@
       "traject": "10:20",
       "destination": "Campus"
     }
-  ]
+  ],
+  "test_slot": ""
 }
