@@ -1,3 +1,4 @@
+since reCaptcha has been added, a new verion of this script is available in recaptcha branch 
 # trz01
 
 automate zone01 transport booking
