@@ -41,23 +41,25 @@ export class CaptchaSolver {
       await this.#page.locator(selector).click();
     }
   }
-
-  async solveCaptcha() {
+async solveCaptcha() {
+  try {
     const iframe = await this.#page.waitForSelector(
-      'iframe[title="reCAPTCHA"]'
+      'iframe[title="reCAPTCHA"]',
+      { timeout: 3000 } // short timeout
     );
     const frame = await iframe.contentFrame();
     await frame.waitForSelector("#rc-anchor-container");
     await frame.locator("#rc-anchor-container").click();
 
     const challenge_iframe = await this.#page.waitForSelector(
-      'iframe[title="recaptcha challenge expires in two minutes"]'
+      'iframe[title="recaptcha challenge expires in two minutes"]',
+      { timeout: 3000 }
     );
-
     const challenge_frame = await challenge_iframe.contentFrame();
     await challenge_frame.waitForSelector(".audio-button-holder");
     await challenge_frame.locator(".audio-button-holder").click();
 
+    // Wait for either captcha completion or user failure
     frame
       .waitForSelector(".recaptcha-checkbox-checked", { timeout: 60000 })
       .then(() => this.#answer.reject());
@@ -66,17 +68,25 @@ export class CaptchaSolver {
       try {
         const text = await this.#answer.promise;
         this.#answer.reset();
+
         if (text.trim().length === 0) {
-          await challenge_frame.click("#recaptcha-reload-button", {
-            delay: 4.2,
-          });
+          await challenge_frame.click("#recaptcha-reload-button", { delay: 4.2 });
           continue;
         }
+
         await challenge_frame.type("#audio-response", text, { delay: 20 });
         await challenge_frame.click("#recaptcha-verify-button", { delay: 10 });
       } catch {
-        break;
+        break; // captcha resolved or failed
       }
     }
-  } 
+  } catch (err) {
+    // If captcha doesn't exist or fails, just continue
+    console.log("Captcha not found or failed, continuing...");
+  } finally {
+    // Always resolve #answer so execFlow can continue
+    this.#answer.resolve();
+  }
+}
+ 
 }

@@ -3,7 +3,7 @@
   "#chormiumBinary": "/usr/bin/chromium-browser",
   "slots": [
     {
-      "run_at": "12:23:00",
+      "run_at": "11:59:50",
       "traject": "17:30",
       "destination": "Bab El Gharbi"
     },
@@ -13,5 +13,5 @@
       "destination": "Campus"
     }
   ],
-  "test_slot": ""
+  "test_slot": "09:40"
 }
